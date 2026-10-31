@@ -1,0 +1,190 @@
+                                 _____________________________
+
+                                        SaTScan v10.3.2
+                                 _____________________________
+
+
+Program run on: Fri Oct 30 15:34:44 2026
+
+Purely Spatial analysis
+scanning for clusters with high rates
+using the Discrete Poisson model.
+_______________________________________________________________________________________________
+
+SUMMARY OF DATA
+
+Study period.......................: 2020/1/1 to 2020/12/31
+Number of locations................: 67
+Population, averaged over time.....: 12801989
+Total number of cases..............: 16030
+Annual cases / 100000..............: 125.0
+_______________________________________________________________________________________________
+
+CLUSTERS DETECTED
+
+1.Location IDs included.: 42103, 42089, 42127, 42069, 42095, 42025, 42079, 42115, 42131, 42077,
+                          42017, 42037, 42107, 42113, 42011, 42091, 42015, 42093, 42101, 42097,
+                          42045
+  Coordinates / radius..: (41.331900 N, 75.033830 W) / 160.26 km
+  Span..................: 229.41 km
+  Population............: 6023384
+  Number of cases.......: 8717
+  Expected cases........: 7542.18
+  Annual cases / 100000.: 144.4
+  Observed / expected...: 1.16
+  Relative risk.........: 1.34
+  Log likelihood ratio..: 172.427530
+  P-value...............: 0.001
+
+2.Location IDs included.: 42087, 42067, 42061
+  Coordinates / radius..: (40.610280 N, 77.617430 W) / 37.53 km
+  Span..................: 50.54 km
+  Population............: 116045
+  Number of cases.......: 253
+  Expected cases........: 145.31
+  Annual cases / 100000.: 217.6
+  Observed / expected...: 1.74
+  Relative risk.........: 1.75
+  Log likelihood ratio..: 32.972706
+  P-value...............: 0.001
+
+3.Location IDs included.: 42021, 42013, 42063, 42009
+  Coordinates / radius..: (40.495050 N, 78.713760 W) / 57.52 km
+  Span..................: 87.78 km
+  Population............: 383982
+  Number of cases.......: 642
+  Expected cases........: 480.80
+  Annual cases / 100000.: 166.8
+  Observed / expected...: 1.34
+  Relative risk.........: 1.35
+  Log likelihood ratio..: 25.263444
+  P-value...............: 0.001
+
+4.Location IDs included.: 42007, 42073
+  Coordinates / radius..: (40.682140 N, 80.349360 W) / 34.36 km
+  Span..................: 34.36 km
+  Population............: 249441
+  Number of cases.......: 378
+  Expected cases........: 312.34
+  Annual cases / 100000.: 151.2
+  Observed / expected...: 1.21
+  Relative risk.........: 1.22
+  Log likelihood ratio..: 6.601009
+  P-value...............: 0.051
+_______________________________________________________________________________________________
+
+ADDITIONAL RESULTS FILES
+
+Cluster Information              : /Users/maggie/classes/BSTA374/assignments/bsta374_assignment6/satscan/high50.col.dbf
+Stratified Cluster File          : /Users/maggie/classes/BSTA374/assignments/bsta374_assignment6/satscan/high50.sci.dbf
+Location Information             : /Users/maggie/classes/BSTA374/assignments/bsta374_assignment6/satscan/high50.gis.dbf
+Risk Estimates for Each Location : /Users/maggie/classes/BSTA374/assignments/bsta374_assignment6/satscan/high50.rr.dbf
+Simulated Log Likelihood Ratios  : /Users/maggie/classes/BSTA374/assignments/bsta374_assignment6/satscan/high50.llr.dbf
+_______________________________________________________________________________________________
+
+PARAMETER SETTINGS
+
+Input
+-----
+  Case File        : /Users/maggie/classes/BSTA374/assignments/bsta374_assignment6/satscan/pa_covid.cas
+  Population File  : /Users/maggie/classes/BSTA374/assignments/bsta374_assignment6/satscan/pa_covid.pop
+  Time Precision   : None
+  Start Date       : 2020/1/1
+  End Date         : 2020/12/31
+  Coordinates File : /Users/maggie/classes/BSTA374/assignments/bsta374_assignment6/satscan/pa_covid.geo
+  Coordinates      : Latitude/Longitude
+
+Analysis
+--------
+  Type of Analysis    : Purely Spatial
+  Probability Model   : Discrete Poisson
+  Scan For Areas With : High Rates
+
+Output
+------
+  Main Results File                : /Users/maggie/classes/BSTA374/assignments/bsta374_assignment6/satscan/high50.txt
+  HTML file for Google Map         : No
+  KML file for Google Earth        : No
+  Shapefile for GIS software       : No
+  HTML file for Cartesian map      : No
+  Cluster Information              : No (ASCII), Yes (dBase)
+  Stratified Cluster Information   : No (ASCII), Yes (dBase)
+  Location Information             : No (ASCII), Yes (dBase)
+  Risk Estimates for Each Location : No (ASCII), Yes (dBase)
+  Simulated Log Likelihood Ratios  : No (ASCII), Yes (dBase)
+
+Data Checking
+-------------
+  Temporal Data Check     : Check to ensure that all cases and controls are within the specified temporal study period.
+  Geographical Data Check : Check to ensure that all observations (cases, controls and populations) are within the specified geographical area.
+
+Spatial Neighbors
+-----------------
+  Specify neighbors through a non-Euclidean neighbors file : No
+  Specify a meta location file                             : No
+  Observations with Multiple Locations                     : One location per observation.
+
+Locations Network
+-----------------
+  Use Locations Network File : No
+
+Spatial Window
+--------------
+  Maximum Spatial Cluster Size : 50 percent of population at risk
+  Window Shape                 : Circular
+  Isotonic Scan                : No
+
+Cluster Restrictions
+--------------------
+  Minimum Cases in Cluster for High Rates : 2
+  Restrict High Rate Clusters             : No
+
+Space And Time Adjustments
+--------------------------
+  Adjust for Known Relative Risks : No
+
+Inference
+---------
+  P-Value Reporting                  : Standard Monte Carlo
+  Report Gumbel Based P-Values       : No
+  Number of Replications             : 999
+  Adjusting for More Likely Clusters : No
+
+Drilldown
+---------
+  Same Design as Main Analysis : No
+
+Miscellaneous Analysis
+----------------------
+  Report Oliveira's F : No
+
+Spatial Output
+--------------
+  Report Hierarchical Clusters              : Yes
+  Criteria for Reporting Secondary Clusters : No Geographical Overlap
+  Report Gini Optimized Cluster Collection  : No
+  Restrict Reporting to Smaller Clusters    : No
+
+Other Output
+------------
+  Report Critical Values  : No
+  Report Monte Carlo Rank : No
+  User Defined Title      : 
+
+Notifications
+-------------
+  Always Send Email                      : No
+  Send Email with Results Meeting Cutoff : No
+
+Run Options
+-----------
+  Processor Usage   : All Available Processors
+  Suppress Warnings : No
+  Logging Analysis  : No
+_______________________________________________________________________________________________
+
+RUN INFORMATION
+
+Program completed  : Fri Oct 30 15:34:47 2026
+Total Running Time : 3 seconds
+Processor Usage    : 10 processors

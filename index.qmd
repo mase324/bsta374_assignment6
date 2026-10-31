@@ -1,0 +1,682 @@
+---
+title: "Exercise 6 --- Cluster Detection with SaTScan"
+subtitle: "BSTA 374 · 17.5 points · Due Friday, October 30, 2026, 11:59 pm"
+author: "Maggie Sobaszek · Lehigh University"
+date: last-modified
+format:
+  html:
+    theme: cosmo
+    toc: true
+    toc-depth: 2
+    toc-location: left
+    toc-title: "On this page"
+    number-sections: false
+    code-copy: true
+    highlight-style: github
+    embed-resources: true
+execute:
+  warning: false
+  message: false
+  eval: true
+  echo: true
+---
+
+## What this exercise is
+
+Exercises 4 and 5 asked whether counties with similar SMRs sit next to each
+other. The **spatial scan statistic** asks a different question: *is there a
+group of neighbouring counties where more people died than expected?* You can answer this question using **SaTScan**, on the same data: 2020 COVID-19 deaths in Pennsylvania's
+67 counties.
+
+Every SaTScan analysis rests on choices made before the scan runs. You make
+three of them here and see how each changes the answer:
+
+1. the **probability model** (Part B);
+2. the **maximum size of the scanning window** (Part C);
+3. how to read the **Monte Carlo $p$-value** (Part D).
+
+**Everything runs from this file.** R writes SaTScan's input files and a
+parameter file, runs SaTScan in the background, and reads the results back.
+You do not need to open the SaTScan window. **All the R code is provided**;
+you do not need to write new code. Run the chunks one at a time with the green
+▶ button, read the output, and type your answer under each question. One or
+two sentences per question is enough.
+
+::: {.callout-important}
+## Before you start
+1. Install **SaTScan** (free) from [satscan.org](https://www.satscan.org),
+   version 10.3 or later; the download asks you to fill in a short form.
+   Keep the default location: on Windows the installer puts it in
+   `C:\Program Files\SaTScan`; on a Mac, drag **SaTScan** into
+   **Applications**.
+2. In the RStudio **Console**, run once: `install.packages("rsatscan")`.
+3. Save this file as `LASTNAME_FI_Exercise6.qmd` and put
+   `pa_covid_deaths_2020.csv` in a `data/` folder next to it, as in
+   Exercise 5.
+4. I strongly suggest that you look into the satscan [tutorial](https://www.satscan.org/cgi-bin/satscan/register.pl/SaTScan_Users_Guide.pdf?todo=process_userguide_download)
+:::
+
+::: {.callout-important}
+## Submission
+Choose **either** option; both earn the same credit.
+
+- **Option 1:** upload `LASTNAME_FI_Exercise6.qmd`, with your answers typed
+  in, to Course Site. No rendering needed.
+- **Option 2:** render the page, publish it to GitHub Pages as for
+  Exercise 4, and submit the `.qmd` and the page URL.
+
+**Due Wednesday, October 28, 2026 at 11:59 pm.** Late work follows the policy
+in the syllabus.
+:::
+
+::: {.callout-tip}
+## If something does not run
+- Restart R (*Session → Restart R*) and run the chunks from the top, in
+  order. Most errors come from a chunk skipped or run out of order.
+- If the `find-satscan` chunk stops with *SaTScan not found*, locate
+  `SaTScanBatch64.exe` (Windows) or `SaTScan.app` (Mac) on your computer and
+  follow the instruction in that chunk.
+- On a Mac, if SaTScan is found but does not run, open SaTScan once from
+  **Applications**, close it, and try again.
+- If it still fails, email me the exact error message --- or answer the
+  questions you can; partial answers earn partial credit.
+:::
+
+### The five SaTScan runs at a glance
+
+| Run | Scan for | Maximum window | Replications | Part |
+|---|---|---|---|---|
+| `high50` | high rates | 50% of population | 999 | B |
+| `high25` | high rates | 25% | 999 | C |
+| `high15` | high rates | 15% | 999 | C |
+| `high25_r99` | high rates | 25% | 99 | D |
+| `low25` | low rates | 25% | 999 | E |
+
+---
+
+## Part A --- Find SaTScan and prepare the input files (1.5 points)
+
+This chunk repeats the first steps of Exercises 4 and 5: the join, the state
+rate and the expected deaths.
+
+```{r}
+#| label: setup
+
+library(sf)
+library(dplyr)
+library(readr)
+library(ggplot2)
+library(patchwork)
+library(rsatscan)                   # runs SaTScan from R
+library(tigris)
+options(tigris_use_cache = TRUE)
+
+covid <- read_csv("data/pa_covid_deaths_2020.csv", show_col_types = FALSE) |>
+  mutate(GEOID = sprintf("%05d", as.integer(FIPS)))      # text key, as in Ex. 4
+pa <- counties(state = "PA", cb = TRUE, year = 2020, progress_bar = FALSE)
+
+pa_covid <- pa |>
+  left_join(covid, by = "GEOID") |>
+  st_transform(5070) |>
+  arrange(GEOID)
+
+r <- sum(pa_covid$deaths_2020) / sum(pa_covid$Population)   # state rate
+pa_covid <- pa_covid |>
+  mutate(E   = r * Population,                              # expected deaths
+         SMR = deaths_2020 / E)
+```
+
+R needs to know where SaTScan's **batch program** is: the part of SaTScan that
+runs without a window. The chunk looks in the places the installer uses.
+
+```{r}
+#| label: find-satscan
+
+# if SaTScan is installed elsewhere, paste the full path to
+# SaTScanBatch64.exe (Windows) or satscan (Mac) between the quotes
+my_path <- ""
+
+candidates <- c(my_path,
+                "C:/Program Files/SaTScan/SaTScanBatch64.exe",      # Windows
+                "C:/Program Files (x86)/SaTScan/SaTScanBatch.exe",  # Windows, 32-bit
+                "/Applications/SaTScan.app/Contents/app/satscan",   # Mac
+                "/opt/satscan/lib/app/satscan64")                   # Linux
+ss_exe <- candidates[candidates != "" & file.exists(candidates)][1]
+if (is.na(ss_exe)) stop("SaTScan not found: install it, or set my_path above")
+
+ss_dir   <- dirname(ss_exe)                                 # its folder
+ss_batch <- tools::file_path_sans_ext(basename(ss_exe))     # its name
+ss_exe
+```
+
+SaTScan reads three plain text files linked by a **location ID**, here the
+county `GEOID`, exactly as in the lecture.
+
+| File | Columns | Here |
+|---|---|---|
+| Case file `.cas` | location ID, number of cases | GEOID, deaths in 2020 |
+| Population file `.pop` | location ID, year, population | GEOID, 2020, population |
+| Coordinates file `.geo` | location ID, latitude, longitude | GEOID, county centroid |
+
+```{r}
+#| label: write-files
+
+dir.create("satscan", showWarnings = FALSE)                  # folder for SaTScan
+ss_folder <- normalizePath("satscan", winslash = "/")        # its full path
+
+# county centroids in latitude / longitude
+ll <- pa_covid |>
+  st_centroid() |>
+  st_transform(4326) |>                         # SaTScan wants lat/long
+  st_coordinates()
+
+# one plain table with everything SaTScan needs
+ss <- pa_covid |>
+  st_drop_geometry() |>
+  mutate(year = 2020,
+         lat  = round(ll[, "Y"], 5),
+         lon  = round(ll[, "X"], 5))
+
+# three files, no header (rsatscan adds the extensions)
+write.cas(select(ss, GEOID, deaths_2020),      ss_folder, "pa_covid")
+write.pop(select(ss, GEOID, year, Population), ss_folder, "pa_covid")
+write.geo(select(ss, GEOID, lat, lon),         ss_folder, "pa_covid")
+
+# first three lines of each file
+readLines("satscan/pa_covid.cas", n = 3)
+readLines("satscan/pa_covid.pop", n = 3)
+readLines("satscan/pa_covid.geo", n = 3)
+
+# totals written to the files
+c(deaths = sum(ss$deaths_2020), population = sum(ss$Population))
+```
+
+::: {.callout-warning}
+## Two common mistakes
+- The coordinates file lists **latitude, then longitude**. Swapped, they put
+  Pennsylvania in Antarctica, and SaTScan still runs.
+- The location IDs must be **identical** in all three files. A county whose ID
+  does not match is dropped without an error message.
+:::
+
+**A1.** How many deaths and how many people did you write to the files?
+
+**There are 16,030 deaths and a population of 12,801,989.**
+
+**A2.** SaTScan places each county at a single point, its centroid, and a
+county enters a scanning circle when that point does. Think of a large rural
+county whose people live mostly in one town near its edge. Why might the
+centroid misplace that county's deaths?
+
+**It would move the location of deaths to the center of the county instead of the edge of the county where they actually occur. Because the deaths are moved to the center of the county, it could not identify clusters accurately because the deaths would not be seen until the center of the county in SaTScan.**
+
+---
+
+## Part B --- Choose the model and run the scan (4.5 points)
+
+### Which probability model?
+
+SaTScan offers several probability models. The model depends on the **data
+you have**, not on the result you hope for.
+
+| Model | Data needed | Typical use |
+|---|---|---|
+| Poisson | case counts and population at risk | rates by area |
+| Bernoulli | cases and controls (0/1 for each person) | case--control studies |
+| Space--time permutation | case counts with dates, no population | rapid outbreak detection |
+| Normal | a continuous measurement | e.g. birth weight, exposure levels |
+
+**B1.** For each study, name the model you would choose and say in a few
+words why. Copy the table and fill it in.
+
+| Study | Model | Why |
+|---|---|---|
+| (a) COVID-19 deaths by county, with each county's population (this exercise) | | |
+| (b) Children born with a heart defect, and a random sample of children born without one, each with a home address | | |
+| (c) Daily emergency-room visits for diarrhoea by ZIP code, with no reliable population for the ZIP codes | | |
+| (d) Blood lead level (µg/dL) of every child tested in each census tract | | |
+
+| (a) | **Poisson** | **Looking at the counts of COVID-19 deaths by counties in Pennsylvania.** |
+| (b) | **Bernoulli** | **Having a case and control group, the study looking at children with heart defects and those without where the outcome is binary.** |
+| (c) | **Space-time permutation** | **Getting the number of cases - emergency room visits for diarrhea, but no population, or no reliable population for zip codes** |
+| (d) | **Normal** | **Blood lead levels are a continuous measurement, and it's of all children in each census tract** |
+
+
+**B2.** We scan **deaths**, yet the Poisson model also needs a **population**
+file. What does SaTScan use the population for, and what is the null
+hypothesis the scan tests?
+
+**SaTScan uses the population for the LLR. The null hypothesis is that the ratio of the count of deaths and expected deaths is the same in all counties.**
+
+### The settings
+
+In class you chose the settings on the tabs of the SaTScan window. Here the
+same settings go into a **parameter file** (`.prm`) that SaTScan reads. The
+function below writes that file with `ss.options()` and then runs SaTScan.
+
+| Setting in the code | Tab in the SaTScan window | Value here |
+|---|---|---|
+| `CaseFile`, `PopulationFile`, `CoordinatesFile` | Input | the three files from Part A |
+| `CoordinatesType = 1` | Input | latitude / longitude |
+| `PrecisionCaseTimes = 0` | Input | time precision: none |
+| `AnalysisType = 1` | Analysis | purely spatial |
+| `ModelType = 0` | Analysis | discrete Poisson |
+| `ScanAreas` | Analysis | 1 = high rates, 2 = low rates |
+| `MaxSpatialSizeInPopulationAtRisk` | Analysis → Advanced → Spatial Window | maximum window, % of population |
+| `MonteCarloReps` | Analysis → Advanced → Inference | number of replications |
+| `PValueReportType = 1` | Analysis → Advanced → Inference | standard Monte Carlo $p$-value |
+
+Only three settings change between runs, so they are the function's
+arguments: what to scan for, the maximum window and the number of
+replications.
+
+```{r}
+#| label: run-satscan-function
+
+run_satscan <- function(name, scan_for = "high", max_window = 50, reps = 999) {
+  invisible(ss.options(reset = TRUE))                    # start from defaults
+  ss.options(list(
+    CaseFile           = "pa_covid.cas",                 # input files
+    PopulationFile     = "pa_covid.pop",
+    CoordinatesFile    = "pa_covid.geo",
+    CoordinatesType    = 1,                              # latitude / longitude
+    PrecisionCaseTimes = 0,                              # no dates
+    StartDate          = "2020/1/1",
+    EndDate            = "2020/12/31",
+    AnalysisType       = 1,                              # purely spatial
+    ModelType          = 0,                              # discrete Poisson
+    ScanAreas          = if (scan_for == "high") 1 else 2,  # high or low rates
+    MaxSpatialSizeInPopulationAtRisk = max_window,       # % of population
+    SpatialWindowShapeType = 0,                          # circles
+    MonteCarloReps     = reps,                           # random maps
+    PValueReportType   = 1,                              # standard Monte Carlo
+    SaveSimLLRsDBase   = "y",                            # keep their LLRs
+    OutputGoogleMaps   = "n",                            # no extra output
+    LaunchMapViewer    = "n",
+    OutputShapefiles   = "n"))
+  write.ss.prm(ss_folder, name)                          # parameter file
+  res <- satscan(ss_folder, name, sslocation = ss_dir,
+                 ssbatchfilename = ss_batch, cleanup = FALSE)   # run SaTScan
+  if (!is.data.frame(res$col)) stop("SaTScan produced no clusters: check the files in Part A")
+  res
+}
+```
+
+::: {.callout-note}
+## Why standard Monte Carlo?
+SaTScan's default $p$-value replaces very small Monte Carlo $p$-values with an
+approximation (Gumbel) and can print values such as $10^{-17}$. We ask for the
+**standard Monte Carlo** $p$-value so that every $p$-value comes straight from
+the replications, and you can check it by hand in Part D.
+:::
+
+### Run 1: `high50`
+
+```{r}
+#| label: run-high50
+
+high50 <- run_satscan("high50", scan_for = "high", max_window = 50, reps = 999)
+```
+
+SaTScan wrote `high50.prm` (the settings), `high50.txt` (the results, for
+people) and three `.dbf` files (the results, for software) in your `satscan`
+folder. If you like, open `high50.prm` in the SaTScan window: the same
+settings appear on the tabs you saw in class.
+
+### Read the results
+
+The top of `high50.txt` gives the SaTScan version, the analysis, and a
+*SUMMARY OF DATA* that reports what SaTScan read:
+
+```{r}
+#| label: summary-of-data
+
+txt   <- high50$main                                        # high50.txt, line by line
+start <- grep("SUMMARY OF DATA", txt)
+cat(txt[1:(start + 8)], sep = "\n")
+```
+
+Two helper functions turn the results into a table, with one row per cluster,
+and a map. You do not need to understand them to use them.
+
+```{r}
+#| label: helpers
+#| code-fold: true
+#| code-summary: "Code for the two helper functions (optional)"
+
+# table: one row per cluster SaTScan reported
+ss_table <- function(res) {
+  col <- res$col                                            # clusters
+  gis <- res$gis                                            # counties in them
+  out <- NULL
+  for (k in col$CLUSTER) {
+    cl     <- col[col$CLUSTER == k, ]                       # cluster k
+    inside <- pa_covid$GEOID %in% trimws(as.character(gis$LOC_ID[gis$CLUSTER == k]))
+    row <- data.frame(
+      cluster   = k,
+      counties  = paste(sort(pa_covid$NAME[inside]), collapse = ", "),
+      n         = sum(inside),                              # number of counties
+      pop_pct   = round(100 * sum(pa_covid$Population[inside]) /
+                          sum(pa_covid$Population), 1),     # % of state population
+      radius_km = round(cl$RADIUS),
+      observed  = cl$OBSERVED,
+      expected  = round(cl$EXPECTED),
+      O_E       = round(cl$ODE, 2),                         # inside vs state rate
+      RR        = round(cl$REL_RISK, 2),                    # inside vs outside
+      LLR       = round(cl$LLR, 2),
+      p_value   = cl$P_VALUE)
+    out <- rbind(out, row)                                  # add the row
+  }
+  out
+}
+
+# map: clusters with p < 0.05 in colour (dark = most likely), the rest grey
+ss_map <- function(res, title, colours = c("#67000D", "#CB181D", "#FB6A4A", "#FCBBA1")) {
+  tab <- ss_table(res)
+  gis <- res$gis
+  sig <- tab$cluster[tab$p_value < 0.05]                    # significant clusters
+  pa_covid$cluster <- NA                                    # no cluster yet
+  for (k in sig) {
+    ids <- trimws(as.character(gis$LOC_ID[gis$CLUSTER == k]))
+    pa_covid$cluster[pa_covid$GEOID %in% ids] <- k
+  }
+  ggplot() +
+    geom_sf(data = pa_covid, fill = "grey92", colour = "white", linewidth = 0.15) +
+    geom_sf(data = filter(pa_covid, !is.na(cluster)),
+            aes(fill = factor(cluster)), colour = "white", linewidth = 0.15) +
+    scale_fill_manual(values = colorRampPalette(colours)(length(sig)),
+                      name = "Cluster") +                   # dark to light
+    labs(title = title, subtitle = "Clusters with p < 0.05") +
+    theme_void()
+}
+```
+
+```{r}
+#| label: results-50
+#| fig-width: 10
+#| fig-height: 3.5
+
+tab50 <- ss_table(high50)
+knitr::kable(tab50)                           # every cluster SaTScan reported
+
+# the SMR map, for comparison, with the classes of Exercise 4
+pa_covid <- pa_covid |>
+  mutate(smr_class = cut(SMR, breaks = c(0, 0.5, 2/3, 0.9, 1/0.9, 1.5, 2, Inf),
+                         labels = c("< 0.50", "0.50-0.67", "0.67-0.90", "0.90-1.11",
+                                    "1.11-1.50", "1.50-2.00", "> 2.00")))
+p_smr <- ggplot(pa_covid) +
+  geom_sf(aes(fill = smr_class), colour = "white", linewidth = 0.15) +
+  scale_fill_brewer(palette = "RdBu", direction = -1, drop = FALSE, name = "SMR") +
+  labs(title = "SMR, 2020") +
+  theme_void()
+
+p_smr + ss_map(high50, "High-rate clusters, max 50%")
+```
+
+| Column | Meaning |
+|---|---|
+| `observed`, `expected` | deaths inside the circle, and the number expected at the state rate |
+| `O_E` | observed / expected: the rate inside compared with the **state** rate |
+| `RR` | relative risk: the rate inside divided by the rate **outside** the circle |
+| `LLR` | log-likelihood ratio: the strength of the evidence; the largest is the most likely cluster |
+| `radius_km` | distance from the circle's centre to its farthest county centroid |
+
+**B3.** Compare the *SUMMARY OF DATA* printed above with your totals in A1.
+Did SaTScan read every county, every death and every person? Why is this
+check worth making before you read any cluster?
+**SaTScan did read every county, death, and person. It’s important to check to confirm everything is there and correct because anything missing could affect the SaTScan clusters.**
+
+
+**B4.** Describe the **most likely cluster** (cluster 1): how many counties,
+what share of the state's population, its observed/expected ratio and its
+relative risk. Look at the SMR map: is every county inside it above 1? Why is
+its RR larger than its O/E?
+**Cluster 1 has 22 counties, population of 6023384 which is 47% of the state’s population. The observed/expected ratio is 1.16 and relative risk is 1.34. In the SMR map, not every county in the most likely cluster has an SMR above 1. The RR is larger than OE because OE looks at the county vs the state rate and RR looks at the county vs area right outside of it.**
+
+
+
+**B5.** How many clusters did SaTScan report, and how many have
+$p < 0.05$? Why does SaTScan list clusters that are not significant, and why
+does our map colour only those with $p < 0.05$?
+
+**There were four clusters that SaTScan reported, and 3 had a p-value less than 0.05. The map only shows p<0.05 because 'sig' selects for only clusters <0.05. The line 'for (k in sig)' gives cluster numbers to only significant clusters. So when the ss_map using ggplot, colors are only assigned to significant clusters.**
+
+---
+
+## Part C --- The maximum window (4 points)
+
+The 50% maximum is SaTScan's default, not a rule. We run the scan twice more,
+changing **only** the maximum window.
+
+```{r}
+#| label: windows
+#| fig-width: 12
+#| fig-height: 3.5
+
+high25 <- run_satscan("high25", scan_for = "high", max_window = 25, reps = 999)
+high15 <- run_satscan("high15", scan_for = "high", max_window = 15, reps = 999)
+
+tab25 <- ss_table(high25)
+tab15 <- ss_table(high15)
+
+knitr::kable(tab25, caption = "Maximum 25%")
+knitr::kable(tab15, caption = "Maximum 15%")
+
+# the three runs side by side
+ss_map(high50, "Max 50%") + ss_map(high25, "Max 25%") + ss_map(high15, "Max 15%")
+
+# one line per run, for the most likely cluster
+runs <- list("50%" = tab50, "25%" = tab25, "15%" = tab15)
+compare <- NULL
+for (w in names(runs)) {
+  tab <- runs[[w]]
+  compare <- rbind(compare, data.frame(
+    max_window   = w,
+    significant  = sum(tab$p_value < 0.05),     # clusters with p < 0.05
+    mlc_counties = tab$n[1],                    # most likely cluster
+    mlc_pop_pct  = tab$pop_pct[1],
+    mlc_RR       = tab$RR[1],
+    mlc_LLR      = tab$LLR[1]))
+}
+knitr::kable(compare)
+```
+
+**C1.** How does the most likely cluster change from the 50% to the 25% to the
+15% window? Name its counties in the 15% run.
+**Everything decreases except the number of significant clusters increase. In the 15%, there is only 1 county, compared to the 21 counties with 50%.**
+
+
+**C2.** Which clusters appear in all three runs, with the same counties? Why
+does a cluster that survives a change of window deserve more confidence than
+one that does not?
+
+**The clusters that appear in all three runs: Bedford, Blair, Cambria, Indiana; Beaver, Lawrence; Huntingdon, Juniata, Mifflin. If the clusters remain the same then their clustering isn't dependent on the window size, but this doesn't mean that the results are statistically significant.**
+
+**C3.** The window is defined by **population**, not by distance. Use the
+`radius_km` column to compare a cluster in the Philadelphia area with one in
+central or western Pennsylvania. Why are the circles so different in size?
+In the 15% run, could Philadelphia and Delaware counties ever fall in the same
+cluster? (Hint: `pop_pct`.)
+
+**Since the county appears as a centroid, counties that have the maximum window as their population size would show 0 km, whereas multiple counties take up more space and have larger radii. In the 15% run, because of their population sizes, Philadelphia and Delaware counties could not fall into the same cluster.**
+
+
+**C4.** Which maximum window would you use in a report to the Pennsylvania
+Department of Health, and why? There is no single right answer; give a
+reason.
+
+**I would use 15% because it identifies smaller clusters that would be easier to target public health interventions or outreach programs. It's also useful for prioritizing areas of higher risk by looking at the highest clusters.**
+
+---
+
+## Part D --- The Monte Carlo $p$-value (4.5 points)
+
+SaTScan redistributes the observed deaths at random among the counties, in
+proportion to their expected deaths, scans that random map with every circle,
+and keeps the **largest** LLR. It repeats this 999 times, and our settings
+asked it to save those 999 values (`high50.llr.dbf`). In the histogram, the
+dashed line marks their 95th percentile: the LLR a cluster needs for
+$p < 0.05$.
+
+```{r}
+#| label: monte-carlo
+#| fig-width: 7
+#| fig-height: 3.5
+
+sims  <- high50$llr$LLR                    # largest LLR of each random map
+col50 <- high50$col                        # the clusters, unrounded
+length(sims)
+
+ggplot(data.frame(LLR = sims), aes(x = LLR)) +
+  geom_histogram(bins = 30, fill = "grey75", colour = "white") +
+  geom_vline(xintercept = col50$LLR, colour = "red") +                  # our clusters
+  geom_vline(xintercept = quantile(sims, 0.95), linetype = "dashed") +  # p = 0.05
+  scale_x_log10() +
+  labs(title = "Largest LLR in each random map (grey) and in our clusters (red)",
+       x = "LLR (log scale)", y = "Random maps") +
+  theme_minimal()
+
+# the p-value by hand, for each cluster
+p_hand <- numeric(nrow(col50))
+for (k in 1:nrow(col50)) {
+  beat      <- sum(sims >= col50$LLR[k])            # random maps at least as high
+  p_hand[k] <- (beat + 1) / (length(sims) + 1)
+}
+knitr::kable(data.frame(cluster   = col50$CLUSTER,
+                        LLR       = round(col50$LLR, 2),
+                        p_satscan = col50$P_VALUE,
+                        p_by_hand = p_hand))
+```
+
+**D1.** In your own words, what does one grey value in the histogram
+represent? Why is it the **largest** LLR of each random map that is kept,
+rather than the LLR of one circle?
+**One gray value in the histogram represents the largest LLR in a map simulation. It keeps the largest LLR from each simulation because it scans many circles to identify the most likely cluster. Using the largest LLR allows for comparison between observed clusters to the strongest clusters that can occur by change.**
+
+**D2.** Do your hand-computed $p$-values match SaTScan's? Explain the formula
+in words. What is the smallest $p$-value 999 replications can give?
+**They do match SaTScan's values because they use the same Monte Carlo simulations. The p-value is calculated by counting how many random maps have a maximum LLR greater than or equal to the observed cluster's LLR, add 1, and dividing by the total number of simulations plus 1. With 999 simulations, the smallest possible p-value is 0.001.**
+
+
+Now the same scan as `high25`, but with only **99** replications.
+
+```{r}
+#| label: replications
+
+high25_r99 <- run_satscan("high25_r99", scan_for = "high", max_window = 25, reps = 99)
+tab25_99   <- ss_table(high25_r99)
+
+# same clusters, two numbers of replications
+left_join(select(tab25,    cluster, counties, LLR, p_999 = p_value),
+          select(tab25_99, counties, p_99 = p_value),
+          by = "counties") |>
+  knitr::kable()
+```
+
+**D3.** The clusters and their LLRs are the same in both runs; only the
+$p$-values change. What is the smallest $p$-value with 99 replications?
+Compare the $p$-values of the most likely cluster and of the weakest cluster
+in the two runs. Why do analysts use 999 or 9,999 replications rather than 99?
+
+**The smallest p-value with 99 replications is 0.01 but 0.001 for 999. For the weakest cluster, the p-value is 0.046 for 999 and 0.07 for 99. Running 999 or 9,999 replications can reduce the variation in p-value estimates and give more precise p-values.**
+
+**D4.** SaTScan looked at thousands of circles, yet we apply no
+multiple-testing correction. Local Moran's I, by contrast, runs one test per
+county and needs one. Why is the scan's $p$-value already protected against
+having searched so many circles?
+
+**For SaTScan, it uses Monte Carlo simulation and only keeps the largest LLR, so the clusters are compared to the most likely cluster of all the circles rather than just one. But Local Moran's I tests each county separately.**
+
+**D5.** A classmate writes: "The most likely cluster has $p = 0.001$, so there
+is a 99.9% chance that it is a real cluster." Is this right? Rewrite the
+sentence so that it is correct.
+
+**There is a 0.1% chance of finding a cluster with an LLR as large or larger than the observed cluster's LLR.**
+
+---
+
+## Part E --- Scanning for low rates (2 points)
+
+The scan can also look for areas with **fewer** deaths than expected. One more
+run, with the 25% window and 999 replications.
+
+```{r}
+#| label: low-rates
+#| fig-width: 10
+#| fig-height: 3.5
+
+low25 <- run_satscan("low25", scan_for = "low", max_window = 25, reps = 999)
+knitr::kable(ss_table(low25))
+
+ss_map(high50, "High-rate clusters, max 50%") +
+  ss_map(low25, "Low-rate clusters, max 25%",
+         colours = c("#08306B", "#2171B5", "#6BAED6", "#C6DBEF"))
+
+# counties in the 50% most likely high-rate cluster that also sit in a
+# significant low-rate cluster
+in_mlc <- trimws(as.character(high50$gis$LOC_ID[high50$gis$CLUSTER == 1]))
+in_low <- trimws(as.character(low25$gis$LOC_ID[low25$gis$P_VALUE < 0.05]))
+
+pa_covid |>
+  st_drop_geometry() |>
+  filter(GEOID %in% intersect(in_mlc, in_low)) |>
+  select(NAME, deaths_2020, E, SMR)
+```
+
+**E1.** Where is the most likely **low-rate** cluster? Our expected deaths use
+one statewide rate, with no adjustment for age. Give one reason other than
+"less COVID-19" why a county or group of counties could have fewer deaths than
+expected.
+
+**The most likely low-rate cluster is Allegheny, Fayette, Greene, Washington. Pittsburgh is in Allegheny and a larger city in Pennsylvania, and is more likely to be more prepared and have more resources to prevent deaths from COVID-19 than a rural area. It's also possible they had better lockdown policies or restrictions in place to prevent the spread of COVID-19 more.**
+
+
+**E2.** Does any county belong both to the most likely high-rate cluster at
+50% and to a significant low-rate cluster? What does that tell you about how
+to read the **outline** of a large cluster?
+
+**Wayne county belongs to both. SaTScan identifies clusters based on the combined risk of all counties within the circle, so some counties may have lower death rates even when the overall cluster has a higher rate.**
+
+---
+
+## Part F --- Reproducibility and AI use (1 point)
+
+Each run left its parameter file (`.prm`) in your `satscan` folder, and
+SaTScan repeats every setting in a *PARAMETER SETTINGS* section at the end of
+each results file. The main ones for `high50`:
+
+```{r}
+#| label: parameters
+
+keep <- grep(paste("Type of Analysis", "Probability Model", "Scan For Areas With",
+                   "Maximum Spatial Cluster Size", "Window Shape", "P-Value Reporting",
+                   "Number of Replications", "Criteria for Reporting", sep = "|"), txt)
+cat(trimws(txt[keep]), sep = "\n")
+```
+
+**F1.** Name three settings that someone would need to reproduce your most
+likely cluster exactly. Why is a script that writes these settings more
+reliable than a description of what you clicked in the SaTScan window?
+
+**To reproduce most likely cluster they would need type of analysis: purely spatial, probability model: Poisson, and scan for areas with: high rates. A script is more reliable than describing what was clicked in SaTScan because it records the exact settings used and allows someone to rerun the analysis without manually entering them**
+
+**F2.** End your document with one sentence on whether and how you used AI
+tools.
+
+**In Part B, question 5, used ChatGPT to understand the code given to see what in it had the map only showing p-values < 0.05. I used ChatGPT for part D, questions 1 and 2 to understand LLR better and how SaTScan calculates p-values.**
+
+---
+
+## Points
+
+| Part | What earns the points | Points |
+|---|---|---|
+| A | Totals reported; centroid limitation explained | 1.5 |
+| B | Models matched to studies; role of population and null hypothesis; data check; most likely cluster read (O/E vs RR); reported vs significant clusters | 4.5 |
+| C | Change in the most likely cluster; stable clusters; population-based window and radius; window choice justified | 4 |
+| D | Random-map maximum explained; $p$ by hand and its minimum; 99 vs 999 replications; built-in multiple-testing protection; correct reading of $p$ | 4.5 |
+| E | Low-rate cluster located and an alternative explanation; overlap with the 50% cluster interpreted | 2 |
+| F | Settings needed to reproduce the run; AI use note | 1 |
+| | **Total** | **17.5** |
+
+Clear, simple sentences are what earn the points; length does not.
