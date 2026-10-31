@@ -2715,30 +2715,26 @@ window.Quarto = {
 <tbody>
 <tr class="odd">
 <td>(a) COVID-19 deaths by county, with each county’s population (this exercise)</td>
-<td></td>
-<td></td>
+<td><strong>Poisson</strong></td>
+<td><strong>Looking at the counts of COVID-19 deaths by counties in Pennsylvania.</strong></td>
 </tr>
 <tr class="even">
 <td>(b) Children born with a heart defect, and a random sample of children born without one, each with a home address</td>
-<td></td>
-<td></td>
+<td><strong>Bernoulli</strong></td>
+<td><strong>Having a case and control group, the study looking at children with heart defects and those without where the outcome is binary.</strong></td>
 </tr>
 <tr class="odd">
 <td>(c) Daily emergency-room visits for diarrhoea by ZIP code, with no reliable population for the ZIP codes</td>
-<td></td>
-<td></td>
+<td><strong>Space-time permutation</strong></td>
+<td><strong>Getting the number of cases - emergency room visits for diarrhea, but no population, or no reliable population for zip codes</strong></td>
 </tr>
 <tr class="even">
 <td>(d) Blood lead level (µg/dL) of every child tested in each census tract</td>
-<td></td>
-<td></td>
+<td><strong>Normal</strong></td>
+<td><strong>Blood lead levels are a continuous measurement, and it’s of all children in each census tract</strong></td>
 </tr>
 </tbody>
 </table>
-<div class="line-block">(a) | <strong>Poisson</strong> | <strong>Looking at the counts of COVID-19 deaths by counties in Pennsylvania.</strong> |<br>
-(b) | <strong>Bernoulli</strong> | <strong>Having a case and control group, the study looking at children with heart defects and those without where the outcome is binary.</strong> |<br>
-(c) | <strong>Space-time permutation</strong> | <strong>Getting the number of cases - emergency room visits for diarrhea, but no population, or no reliable population for zip codes</strong> |<br>
-(d) | <strong>Normal</strong> | <strong>Blood lead levels are a continuous measurement, and it’s of all children in each census tract</strong> |</div>
 <p><strong>B2.</strong> We scan <strong>deaths</strong>, yet the Poisson model also needs a <strong>population</strong> file. What does SaTScan use the population for, and what is the null hypothesis the scan tests?</p>
 <p><strong>SaTScan uses the population for the LLR. The null hypothesis is that the ratio of the count of deaths and expected deaths is the same in all counties.</strong></p>
 </section>
@@ -2871,7 +2867,7 @@ window.Quarto = {
                                  _____________________________
 
 
-Program run on: Fri Oct 30 20:45:52 2026
+Program run on: Fri Oct 30 20:54:29 2026
 
 Purely Spatial analysis
 scanning for clusters with high rates

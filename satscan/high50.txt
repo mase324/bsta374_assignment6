@@ -4,7 +4,7 @@
                                  _____________________________
 
 
-Program run on: Fri Oct 30 20:45:52 2026
+Program run on: Fri Oct 30 20:54:29 2026
 
 Purely Spatial analysis
 scanning for clusters with high rates
@@ -189,6 +189,6 @@ ________________________________________________________________________________
 
 RUN INFORMATION
 
-Program completed  : Fri Oct 30 20:45:54 2026
+Program completed  : Fri Oct 30 20:54:31 2026
 Total Running Time : 2 seconds
 Processor Usage    : 10 processors
