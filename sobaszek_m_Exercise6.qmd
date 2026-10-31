@@ -233,15 +233,10 @@ words why. Copy the table and fill it in.
 
 | Study | Model | Why |
 |---|---|---|
-| (a) COVID-19 deaths by county, with each county's population (this exercise) | | |
-| (b) Children born with a heart defect, and a random sample of children born without one, each with a home address | | |
-| (c) Daily emergency-room visits for diarrhoea by ZIP code, with no reliable population for the ZIP codes | | |
-| (d) Blood lead level (µg/dL) of every child tested in each census tract | | |
-
-| (a) | **Poisson** | **Looking at the counts of COVID-19 deaths by counties in Pennsylvania.** |
-| (b) | **Bernoulli** | **Having a case and control group, the study looking at children with heart defects and those without where the outcome is binary.** |
-| (c) | **Space-time permutation** | **Getting the number of cases - emergency room visits for diarrhea, but no population, or no reliable population for zip codes** |
-| (d) | **Normal** | **Blood lead levels are a continuous measurement, and it's of all children in each census tract** |
+| (a) COVID-19 deaths by county, with each county's population (this exercise) **Poisson** | **Looking at the counts of COVID-19 deaths by counties in Pennsylvania.** |
+| (b) Children born with a heart defect, and a random sample of children born without one, each with a home address | **Bernoulli** | **Having a case and control group, the study looking at children with heart defects and those without where the outcome is binary.** |
+| (c) Daily emergency-room visits for diarrhoea by ZIP code, with no reliable population for the ZIP codes | **Space-time permutation** | **Getting the number of cases - emergency room visits for diarrhea, but no population, or no reliable population for zip codes** |
+| (d) Blood lead level (µg/dL) of every child tested in each census tract | **Normal** | **Blood lead levels are a continuous measurement, and it's of all children in each census tract** |
 
 
 **B2.** We scan **deaths**, yet the Poisson model also needs a **population**
